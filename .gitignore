@@ -1,0 +1,55 @@
+# Dépendances
+/vendor/
+composer.lock
+
+# Tests
+/tests/coverage/
+.phpunit.result.cache
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Configuration locale
+.env
+.env.local
+.env.test
+.env.production
+
+# Logs
+*.log
+logs/
+
+# Cache
+/cache/
+.cache/
+
+# Documentation générée
+/docs/build/
+
+# Fichiers temporaires
+tmp/
+temp/
+*.tmp
+
+# Clés et certificats
+*.pem
+*.key
+*.crt
+*.p12
+
+# Backup
+*.bak
+*.backup
