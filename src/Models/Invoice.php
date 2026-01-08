@@ -160,8 +160,98 @@ class Invoice
     }
 
     // Getters
-    public function getInvoiceType(): string { return $this->invoiceType; }
-    public function getTemplate(): string { return $this->template; }
-    public function getItems(): array { return $this->items; }
-    // ... autres getters
+    public function getInvoiceType(): string
+    {
+        return $this->invoiceType;
+    }
+
+    public function getPaymentMethod(): string
+    {
+        return $this->paymentMethod;
+    }
+
+    public function getTemplate(): string
+    {
+        return $this->template;
+    }
+
+    public function getPointOfSale(): string
+    {
+        return $this->pointOfSale;
+    }
+
+    public function getEstablishment(): string
+    {
+        return $this->establishment;
+    }
+
+    public function getClientCompanyName(): string
+    {
+        return $this->clientCompanyName;
+    }
+
+    public function getClientPhone(): string
+    {
+        return $this->clientPhone;
+    }
+
+    public function getClientEmail(): string
+    {
+        return $this->clientEmail;
+    }
+
+    public function getClientNcc(): ?string
+    {
+        return $this->clientNcc;
+    }
+
+    public function getClientSellerName(): ?string
+    {
+        return $this->clientSellerName;
+    }
+
+    public function getCommercialMessage(): ?string
+    {
+        return $this->commercialMessage;
+    }
+
+    public function getFooter(): ?string
+    {
+        return $this->footer;
+    }
+
+    public function getForeignCurrency(): ?string
+    {
+        return $this->foreignCurrency;
+    }
+
+    public function getForeignCurrencyRate(): float
+    {
+        return $this->foreignCurrencyRate;
+    }
+
+    public function isRne(): bool
+    {
+        return $this->isRne;
+    }
+
+    public function getRne(): ?string
+    {
+        return $this->rne;
+    }
+
+    public function getDiscount(): float
+    {
+        return $this->discount;
+    }
+
+    public function getItems(): array
+    {
+        return $this->items;
+    }
+
+    public function getCustomTaxes(): array
+    {
+        return $this->customTaxes;
+    }
 }

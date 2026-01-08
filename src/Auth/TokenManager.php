@@ -82,7 +82,7 @@ class TokenManager
         $this->tokenExpiry = null;
     }
 
-    public function clearCache(string $key = null): void
+    public function clearCache(?string $key = null): void
     {
         if ($key) {
             unset($this->cache[$key]);

@@ -1,46 +1,52 @@
-# SDK PHP pour l'API FNE (Facture Normalisée Électronique) - DGI Côte d'Ivoire
+# SDK PHP pour l'API FNE (Facture Normalisee Electronique) - DGI Cote d'Ivoire
 
 [![PHP Version](https://img.shields.io/badge/php-%3E%3D7.4-blue)](https://php.net)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-passing-green)](tests/)
 
-SDK PHP officieux pour l'intégration avec l'API de Facturation Normalisée Électronique (FNE) de la Direction Générale des Impôts de Côte d'Ivoire.
+SDK PHP non-officiel pour l'integration avec l'API de Facturation Normalisee Electronique (FNE) de la Direction Generale des Impots de Cote d'Ivoire.
 
-## 🚀 Fonctionnalités
+## Fonctionnalites
 
-- ✅ **Facturation de vente** (B2B, B2C, B2F, B2G)
-- ✅ **Factures d'avoir** (remboursements partiels ou complets)
-- ✅ **Bordereaux d'achat** de produits agricoles
-- ✅ **Validation automatique** des données
-- ✅ **Gestion d'erreurs** complète et typée
-- ✅ **Mode test et production**
-- ✅ **Retry automatique** en cas d'erreur réseau
-- ✅ **Cache des réponses**
-- ✅ **Support devises étrangères**
-- ✅ **Documentation complète** avec exemples
+- **Facturation de vente** (B2B, B2C, B2F, B2G)
+- **Factures d'avoir** (remboursements partiels ou complets)
+- **Bordereaux d'achat** de produits agricoles
+- **Generation de QR Code** pour la verification des factures
+- **Validation automatique** des donnees selon les specifications FNE
+- **Gestion d'erreurs** complete et typee
+- **Mode test et production**
+- **Retry automatique** en cas d'erreur reseau
+- **Support de 11 devises etrangeres** (USD, EUR, GBP, JPY, CAD, AUD, CNH, CHF, HKD, NZD)
+- **Utilitaires de calcul** (TVA, remises, conversions)
 
-## 📋 Prérequis
+## Prerequis
 
-- PHP 7.4 ou supérieur
+- PHP 7.4 ou superieur
 - Extension cURL
 - Extension JSON
-- Clé API FNE (obtenue après validation par la DGI)
+- Cle API FNE (obtenue apres validation par la DGI)
 
-## 📦 Installation
+## Installation
 
 ```bash
 composer require prodestic/fne-sdk-php
 ```
 
-## 🔑 Configuration
+### Installation optionnelle pour la generation de QR Code
 
-### 1. Obtenir votre clé API
+```bash
+composer require endroid/qr-code
+```
 
-#### - Inscrivez-vous sur la plateforme FNE de test : http://54.247.95.108
-#### - Configurez votre environnement de test
-#### - Développez et testez votre intégration
-#### - Transmettez vos spécimens à support.fne@dgi.gouv.ci
-#### - Récupérez votre clé API dans l'onglet "Paramétrage" après validation
+## Configuration
+
+### 1. Obtenir votre cle API
+
+1. Inscrivez-vous sur la plateforme FNE de test : http://54.247.95.108
+2. Configurez votre environnement de test
+3. Developpez et testez votre integration
+4. Transmettez vos specimens de factures a support.fne@dgi.gouv.ci
+5. Recuperez votre cle API dans l'onglet "Parametrage" apres validation par la DGI
 
 ### 2. Initialisation du client
 
@@ -50,122 +56,205 @@ use DgiCi\FneSdk\FneClient;
 // Mode test
 $client = FneClient::test('votre_cle_api_test');
 
-// Mode production (après validation)
-$client = FneClient::production('votre_cle_api_prod', 'url_production');
+// Mode production (apres validation DGI)
+$client = FneClient::production('votre_cle_api_prod', 'url_production_fournie_par_dgi');
 ```
 
-## 🎯 Utilisation rapide
+## Utilisation
 
-### Facture de vente simple (B2C)
+### Facture de vente B2C (particulier)
 
 ```php
 use DgiCi\FneSdk\FneClient;
+use DgiCi\FneSdk\Models\Invoice;
 use DgiCi\FneSdk\Models\InvoiceItem;
 use DgiCi\FneSdk\Utils\Constants;
 
 $client = FneClient::test('votre_cle_api');
 
-// Créer la facture
-$invoice = $client->invoices()->createSaleInvoice(
-    pointOfSale: 'Caisse 1',
-    establishment: 'Magasin Principal',
-    clientName: 'Jean Dupont',
-    clientPhone: '0709123456',
-    clientEmail: 'jean@email.com'
+// Creer la facture
+$invoice = new Invoice(
+    Constants::INVOICE_TYPE_SALE,
+    Constants::PAYMENT_CASH,
+    Constants::TEMPLATE_B2C,
+    'Caisse 1',           // Point de vente
+    'Magasin Principal',  // Etablissement
+    'Jean Dupont',        // Nom client
+    '0709123456',         // Telephone client
+    'jean@email.com'      // Email client
 );
 
 // Ajouter des articles
 $item = new InvoiceItem(
-    description: 'Ordinateur portable',
-    quantity: 1,
-    amount: 650000,
-    taxes: [Constants::TAX_TVA]
+    'Ordinateur portable', // Description
+    1,                     // Quantite
+    650000,                // Prix unitaire HT
+    [Constants::TAX_TVA]   // Type de TVA (18%)
 );
-
 $invoice->addItem($item);
 
 // Certifier la facture
 $response = $client->invoices()->signInvoice($invoice);
 
-echo "Facture créée: " . $response->getReference();
-echo "QR Code: " . $response->getQrCodeUrl();
+echo "Reference: " . $response->getReference();
+echo "NCC: " . $response->getNcc();
+echo "QR Code URL: " . $response->getToken();
+echo "Stickers restants: " . $response->getBalanceSticker();
 ```
 
-### Facture B2B (entreprise à entreprise)
+### Facture B2B (entreprise a entreprise)
+
+Le NCC du client est **obligatoire** pour les factures B2B.
 
 ```php
-$invoice = $client->invoices()->createB2BInvoice(
-    pointOfSale: 'Service Commercial',
-    establishment: 'Siège Social',
-    clientName: 'KPMG CÔTE D\'IVOIRE',
-    clientPhone: '0709080765',
-    clientEmail: 'info@kpmg.ci',
-    clientNcc: '9502363N', // NCC obligatoire pour B2B
-    paymentMethod: Constants::PAYMENT_TRANSFER
+$invoice = new Invoice(
+    Constants::INVOICE_TYPE_SALE,
+    Constants::PAYMENT_TRANSFER,
+    Constants::TEMPLATE_B2B,
+    'Service Commercial',
+    'Siege Social',
+    'KPMG COTE D\'IVOIRE',
+    '0709080765',
+    'info@kpmg.ci'
 );
 
-// Ajouter services avec taxes personnalisées
-$service = new InvoiceItem('Audit comptable', 1, 2500000, [Constants::TAX_TVA]);
-$service->addCustomTax('Retenue à la source', 5);
+// NCC obligatoire pour B2B
+$invoice->setClientNcc('9502363N');
 
+// Article avec taxes personnalisees
+$service = new InvoiceItem('Audit comptable', 1, 2500000, [Constants::TAX_TVA]);
+$service->addCustomTax('Retenue a la source', 5);
 $invoice->addItem($service);
+
+// Remise globale de 10%
+$invoice->setDiscount(10);
+
 $response = $client->invoices()->signInvoice($invoice);
 ```
 
-### Facture d'avoir
+### Facture B2F (export international)
+
+Les champs `foreignCurrency` et `foreignCurrencyRate` sont **obligatoires** pour B2F.
 
 ```php
-// Créer une demande d'avoir
-$refundRequest = $client->refunds()->createRefundRequest();
-$refundRequest->addItem('item_id_1', 2); // Retourner 2 unités
-$refundRequest->addItem('item_id_2', 1); // Retourner 1 unité
+$invoice = new Invoice(
+    Constants::INVOICE_TYPE_SALE,
+    Constants::PAYMENT_TRANSFER,
+    Constants::TEMPLATE_B2F,
+    'Export',
+    'Siege',
+    'Foreign Company Ltd',
+    '0102030405',
+    'contact@foreign.com'
+);
 
-// Créer l'avoir
-$response = $client->refunds()->createRefund('original_invoice_id', $refundRequest);
+// Devise et taux de change obligatoires
+$invoice->setForeignCurrency(Constants::CURRENCY_EUR, 655.957);
+
+$item = new InvoiceItem('Produit export', 100, 10000, [Constants::TAX_TVAC]);
+$invoice->addItem($item);
+
+$response = $client->invoices()->signInvoice($invoice);
+```
+
+### Facture d'avoir (remboursement)
+
+```php
+use DgiCi\FneSdk\Models\RefundRequest;
+
+// ID de la facture originale (recupere lors de la certification)
+$originalInvoiceId = 'e2b2d8da-a532-4c08-9182-f5b428ca468d';
+
+// Creer la demande d'avoir
+$refundRequest = new RefundRequest();
+$refundRequest->addItem('bf9cc241-9b5f-4d26-a570-aa8e682a759e', 20); // ID article, quantite
+$refundRequest->addItem('50b5c9d9-e22d-4dce-ba3c-5d2519c3418f', 10);
+
+// Creer l'avoir
+$response = $client->refunds()->createRefund($originalInvoiceId, $refundRequest);
+
+echo "Avoir cree: " . $response->getReference();
 ```
 
 ### Bordereau d'achat agricole
 
 ```php
-$purchase = $client->purchases()->createPurchaseInvoice(
-    pointOfSale: 'Centre de collecte',
-    establishment: 'Abengourou',
-    supplierName: 'Coopérative Agricole',
-    supplierPhone: '0709080765',
-    supplierEmail: 'coop@email.com'
+$purchase = new Invoice(
+    Constants::INVOICE_TYPE_PURCHASE,
+    Constants::PAYMENT_MOBILE_MONEY,
+    Constants::TEMPLATE_B2C,
+    'Centre de collecte',
+    'Abengourou',
+    'Cooperative Agricole',
+    '0709080765',
+    'coop@email.ci'
 );
 
-$cacao = new InvoiceItem('Cacao brut premier choix', 1000, 2200, []);
+// Les articles d'achat agricole n'ont pas de taxes
+$cacao = new InvoiceItem('Cacao brut premier choix', 2000, 2200);
+$cacao->setMeasurementUnit('kg');
 $purchase->addItem($cacao);
 
 $response = $client->purchases()->signPurchaseInvoice($purchase);
 ```
 
-## 🔧 Configuration avancée
+## Generation de QR Code
 
-### Client avec options personnalisées
-
-```php
-$client = new FneClient([
-    'api_key' => 'votre_cle',
-    'base_url' => 'url_personnalisée',
-    'timeout' => 60,        // Timeout en secondes
-    'retry_attempts' => 5,  // Nombre de tentatives
-    'test_mode' => true,
-]);
-```
-
-### Gestion des devises étrangères (B2F)
+La classe `Helper` fournit des utilitaires pour generer le QR code de verification.
 
 ```php
-$invoice = $client->invoices()->createB2FInvoice(
-    // ... paramètres de base
-    foreignCurrency: Constants::CURRENCY_EUR,
-    exchangeRate: 655.957 // 1 EUR = 655.957 FCFA
-);
+use DgiCi\FneSdk\Utils\Helper;
+
+// Apres certification
+$response = $client->invoices()->signInvoice($invoice);
+$tokenUrl = $response->getToken();
+
+// Generer le QR code en base64 (pour affichage HTML)
+$qrCodeBase64 = Helper::generateQrCodeBase64($tokenUrl, 300);
+echo '<img src="' . $qrCodeBase64 . '" alt="QR Code FNE">';
+
+// Sauvegarder le QR code dans un fichier
+Helper::saveQrCode($tokenUrl, '/path/to/qrcode.png', 300);
+
+// Generer en SVG
+$svg = Helper::generateQrCode($tokenUrl, 300, 'svg');
 ```
 
-## 🚨 Gestion d'erreurs
+## Utilitaires de calcul
+
+```php
+use DgiCi\FneSdk\Utils\Helper;
+
+// Calcul de TVA
+$ht = 100000;
+$ttc = Helper::calculateTTC($ht, 18);        // 118000
+$tva = Helper::calculateVAT($ht, 18);        // 18000
+$htFromTtc = Helper::calculateHT(118000, 18); // 100000
+
+// Appliquer une remise
+$apresRemise = Helper::applyDiscount(100000, 10); // 90000
+
+// Conversion de devises
+$xof = 655957;
+$eur = Helper::convertCurrency($xof, 655.957, true);  // XOF -> EUR
+$xof = Helper::convertCurrency(1000, 655.957, false); // EUR -> XOF
+
+// Formater un montant
+echo Helper::formatAmount(1250000);      // "1 250 000 FCFA"
+echo Helper::formatAmount(1250000, false); // "1 250 000"
+
+// Obtenir le taux de TVA
+$rate = Helper::getVatRate(Constants::TAX_TVA);  // 18.0
+$rate = Helper::getVatRate(Constants::TAX_TVAB); // 9.0
+
+// Valider un NCC
+$valid = Helper::isValidNcc('9502363N'); // true
+
+// Extraire le token d'une URL
+$token = Helper::extractTokenFromUrl($tokenUrl);
+```
+
+## Gestion d'erreurs
 
 ```php
 use DgiCi\FneSdk\Exceptions\{
@@ -178,159 +267,124 @@ use DgiCi\FneSdk\Exceptions\{
 try {
     $response = $client->invoices()->signInvoice($invoice);
 } catch (ValidationException $e) {
-    // Erreurs de validation des données
+    // Erreurs de validation des donnees
     foreach ($e->getErrors() as $field => $error) {
-        echo "Erreur {$field}: {$error}\n";
+        echo "Erreur sur {$field}: {$error}\n";
     }
 } catch (AuthenticationException $e) {
-    // Problème d'authentification (clé API invalide)
-    echo "Erreur auth: " . $e->getMessage();
+    // Cle API invalide ou expiree (HTTP 401)
+    echo "Erreur d'authentification: " . $e->getMessage();
 } catch (NetworkException $e) {
-    // Problème de réseau/connexion
-    echo "Erreur réseau: " . $e->getMessage();
+    // Probleme de connexion reseau
+    echo "Erreur reseau: " . $e->getMessage();
 } catch (ApiException $e) {
-    // Erreur retournée par l'API FNE
+    // Erreur retournee par l'API FNE (HTTP 400, 500)
     echo "Erreur API: " . $e->getMessage();
     echo "Code: " . $e->getCode();
 }
 ```
 
-## 📊 Types de factures supportés
+## Reference des constantes
 
-| **Type** | **Code**         | **Description**                  | **NCC requis** |
-|----------|------------------|----------------------------------|----------------|
-| B2C      | `TEMPLATE_B2C`   | Entreprise → Consommateur        | Non            |
-| B2B      | `TEMPLATE_B2B`   | Entreprise → Entreprise          | Oui            |
-| B2F      | `TEMPLATE_B2F`   | Entreprise → International       | Non            |
-| B2G      | `TEMPLATE_B2G`   | Entreprise → Gouvernement        | Non            |
+### Types de factures
 
+| Type | Constante | Description | NCC requis |
+|------|-----------|-------------|------------|
+| B2C | `TEMPLATE_B2C` | Entreprise vers Particulier | Non |
+| B2B | `TEMPLATE_B2B` | Entreprise vers Entreprise | **Oui** |
+| B2F | `TEMPLATE_B2F` | Entreprise vers International | Non |
+| B2G | `TEMPLATE_B2G` | Entreprise vers Gouvernement | Non |
 
-## 💰 Méthodes de paiement
+### Methodes de paiement
 
-```php
-Constants::PAYMENT_CASH         // Espèces
-Constants::PAYMENT_CARD         // Carte bancaire
-Constants::PAYMENT_CHECK        // Chèque
-Constants::PAYMENT_MOBILE_MONEY // Mobile Money
-Constants::PAYMENT_TRANSFER     // Virement
-Constants::PAYMENT_DEFERRED     // À terme
-```
+| Methode | Constante | Description |
+|---------|-----------|-------------|
+| Especes | `PAYMENT_CASH` | Paiement en especes |
+| Carte | `PAYMENT_CARD` | Carte bancaire |
+| Cheque | `PAYMENT_CHECK` | Cheque |
+| Mobile Money | `PAYMENT_MOBILE_MONEY` | Orange Money, MTN, Wave, etc. |
+| Virement | `PAYMENT_TRANSFER` | Virement bancaire |
+| A terme | `PAYMENT_DEFERRED` | Paiement differe |
 
-## 🏷️ Types de TVA
+### Types de TVA
 
-```php
-Constants::TAX_TVA   // TVA normale 18%
-Constants::TAX_TVAB  // TVA réduite 9%
-Constants::TAX_TVAC  // TVA exonérée conventionnelle 0%
-Constants::TAX_TVAD  // TVA exonérée légale 0%
-```
+| Type | Constante | Taux | Description |
+|------|-----------|------|-------------|
+| TVA | `TAX_TVA` | 18% | TVA normale |
+| TVAB | `TAX_TVAB` | 9% | TVA reduite |
+| TVAC | `TAX_TVAC` | 0% | Exoneration conventionnelle |
+| TVAD | `TAX_TVAD` | 0% | Exoneration legale (TEE, RME) |
 
-## 🧪 Tests
+### Devises supportees
+
+| Devise | Constante | Description |
+|--------|-----------|-------------|
+| XOF | `CURRENCY_XOF` | Franc CFA |
+| USD | `CURRENCY_USD` | Dollar Americain |
+| EUR | `CURRENCY_EUR` | Euro |
+| GBP | `CURRENCY_GBP` | Livre Sterling |
+| JPY | `CURRENCY_JPY` | Yen Japonais |
+| CAD | `CURRENCY_CAD` | Dollar Canadien |
+| AUD | `CURRENCY_AUD` | Dollar Australien |
+| CNH | `CURRENCY_CNH` | Yuan Chinois |
+| CHF | `CURRENCY_CHF` | Franc Suisse |
+| HKD | `CURRENCY_HKD` | Dollar Hong Kong |
+| NZD | `CURRENCY_NZD` | Dollar Neo-Zelandais |
+
+## Tests
 
 ```bash
-# Tests unitaires
-./vendor/bin/phpunit tests/Unit
-
-# Tests d'intégration
-./vendor/bin/phpunit tests/Integration
-
 # Tous les tests
-./vendor/bin/phpunit
+composer test
+
+# Tests unitaires uniquement
+composer test:unit
+
+# Tests d'integration
+composer test:integration
+
+# Couverture de code
+composer test:coverage
 ```
 
-## 📚 Exemples
+## Exemples
 
 Consultez le dossier `examples/` pour des exemples complets :
 
-- `basic_invoice.php` - Facture simple
-
-- `b2b_invoice.php` - Facture B2B
-
-- `international_invoice.php` - Facture export
-
+- `basic_invoice.php` - Facture simple B2C
+- `b2b_invoice.php` - Facture B2B avec NCC
+- `international_invoice.php` - Facture B2F avec devise
 - `refund_invoice.php` - Facture d'avoir
+- `purchase_invoice.php` - Bordereau d'achat agricole
+- `error_handling.php` - Gestion des erreurs
 
-- `purchase_invoice.php` - Bordereau d'achat
+## Notes importantes
 
-- `error_handling.php` - Gestion d'erreurs
+1. **Environnement de test**: Utilisez toujours l'environnement de test avant la production
+2. **Validation DGI**: Votre integration doit etre validee par la DGI avant utilisation en production
+3. **Cle API**: Gardez votre cle API secrete et ne la commitez jamais dans votre code source
+4. **Stickers**: Surveillez votre balance de stickers via `$response->getBalanceSticker()`
+5. **NCC B2B**: Le NCC client est obligatoire pour toutes les factures B2B
+6. **Devise B2F**: La devise et le taux de change sont obligatoires pour les factures B2F
 
+## Support
 
-## 🔄 Migration et mise à jour
+- **Email support DGI**: support.fne@dgi.gouv.ci
+- **Plateforme de test**: http://54.247.95.108
+- **Issues**: https://github.com/prodestic/fne-sdk-php/issues
 
-```php
-// Ancien
-$client = new FneClient($apiKey, $baseUrl);
+## Contribution
 
-// Nouveau
-$client = FneClient::test($apiKey);
-// ou
-$client = FneClient::production($apiKey, $baseUrl);
-```
+1. Fork le projet
+2. Creez votre branche (`git checkout -b feature/amelioration`)
+3. Committez vos changements (`git commit -m 'Ajout fonctionnalite'`)
+4. Pushez vers la branche (`git push origin feature/amelioration`)
+5. Ouvrez une Pull Request
 
-## 🐛 Débogage
+## Licence
 
-### Activer le mode debug
+Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de details.
 
-```php
-// Définir la variable d'environnement
-putenv('APP_DEBUG=true');
+---
 
-// Les stack traces seront affichées en cas d'erreur
-```
-
-### Vérifier la configuration
-
-```php
-$client = FneClient::test($apiKey);
-$config = $client->getConfig();
-print_r($config);
-```
-
-## 📞 Support
-
-- **Email support technique** : [support.fne@dgi.gouv.ci](mailto:support.fne@dgi.gouv.ci)
-- **Documentation officielle** : [https://fne.dgi.gouv.ci/](https://fne.dgi.gouv.ci/)
-- **Issues GitHub** : [Créer un ticket](https://github.com/<utilisateur>/<repo>/issues/new)
-
-## 🤝 Contribution
-
-- Fork le projet
-- Créer une branche feature (`git checkout -b feature/amelioration`)
-- Commit vos changements (`git commit -am 'Ajout nouvelle fonctionnalité'`)
-- Push vers la branche (`git push origin feature/amelioration`)
-- Créer une Pull Request
-
-## Standards de développement
-
-- PSR-4 pour l'autoloading
-- PSR-12 pour le style de code
-- PHPDoc pour la documentation
-- Tests unitaires obligatoires
-
-## 📄 Licence
-
-Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus de détails.
-
-## 🎯 Roadmap
-
-- Support des webhooks DGI
-- CLI pour tests rapides
-- Cache Redis/Memcached
-- Metrics et monitoring
-- Support Symfony Bundle
-- Support Laravel Package
-
-## ⚠️ Notes importantes
-
-- Environnement de test: Utilisez toujours l'environnement de test avant la production
-- Validation DGI: Votre intégration doit être validée par la DGI avant utilisation en production
-- Clé API: Gardez votre clé API secrète et ne la commitez jamais
-- Stickers: Surveillez votre balance de stickers pour éviter les interruptions
-- Limites: Respectez les limites de taux de l'API
-
-## 📈 Performance
-
-- Cache automatique des réponses pour éviter les appels redondants
-- Retry automatique avec backoff exponentiel
-- Timeout configurable pour éviter les blocages
-- Validation locale avant envoi à l'API
+**Developpe par [PRODESTIC SARL](https://prodestic.net)** - SDK non-officiel pour l'API FNE de la DGI Cote d'Ivoire.

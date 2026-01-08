@@ -5,13 +5,31 @@
   "prefer-stable": true,
   "license": "MIT",
   "type": "library",
-  "keywords": ["fne", "dgi", "cote-ivoire", "facturation", "api"],
+  "keywords": [
+    "fne",
+    "dgi",
+    "cote-ivoire",
+    "ivory-coast",
+    "facturation",
+    "invoice",
+    "tax",
+    "api",
+    "electronic-invoice",
+    "normalization"
+  ],
   "authors": [
     {
       "name": "PRODESITC SARL",
-      "email": "a.niando@prodestic.net"
+      "email": "a.niando@prodestic.net",
+      "homepage": "https://prodestic.net",
+      "role": "Developer"
     }
   ],
+  "homepage": "https://github.com/prodestic/fne-sdk-php",
+  "support": {
+    "email": "support.fne@dgi.gouv.ci",
+    "docs": "https://github.com/prodestic/fne-sdk-php#readme"
+  },
   "require": {
     "php": ">=7.4",
     "ext-json": "*",
@@ -19,9 +37,13 @@
     "guzzlehttp/guzzle": "^7.0"
   },
   "require-dev": {
-    "phpunit/phpunit": "^9.0",
-    "psalm/plugin-phpunit": "^0.16.1",
-    "vimeo/psalm": "^4.8"
+    "phpunit/phpunit": "^9.0|^10.0",
+    "psalm/plugin-phpunit": "^0.16.1|^0.18",
+    "vimeo/psalm": "^4.8|^5.0",
+    "endroid/qr-code": "^5.0"
+  },
+  "suggest": {
+    "endroid/qr-code": "Required for QR code generation (^5.0). Install with: composer require endroid/qr-code"
   },
   "autoload": {
     "psr-4": {
@@ -31,6 +53,24 @@
   "autoload-dev": {
     "psr-4": {
       "DgiCi\\FneSdk\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "test:unit": "phpunit --testsuite=Unit",
+    "test:integration": "phpunit --testsuite=Integration",
+    "test:coverage": "phpunit --coverage-html coverage",
+    "psalm": "psalm",
+    "cs-check": "php-cs-fixer fix --dry-run --diff",
+    "cs-fix": "php-cs-fixer fix"
+  },
+  "config": {
+    "sort-packages": true,
+    "optimize-autoloader": true
+  },
+  "extra": {
+    "branch-alias": {
+      "dev-main": "1.x-dev"
     }
   }
 }

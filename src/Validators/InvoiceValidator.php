@@ -6,91 +6,119 @@ use DgiCi\FneSdk\Models\Invoice;
 use DgiCi\FneSdk\Models\InvoiceItem;
 use DgiCi\FneSdk\Utils\Constants;
 
+/**
+ * Validateur pour les factures FNE
+ *
+ * Valide les données d'une facture selon les spécifications
+ * de l'API FNE de la DGI Côte d'Ivoire.
+ */
 class InvoiceValidator extends BaseValidator
 {
+    /**
+     * Valide une facture complète
+     *
+     * @param Invoice $invoice La facture à valider
+     * @throws \DgiCi\FneSdk\Exceptions\ValidationException Si la validation échoue
+     */
     public function validate(Invoice $invoice): void
     {
-        $this->errors = []; // Reset errors
+        $this->errors = [];
 
         $this->validateInvoiceType($invoice->getInvoiceType());
-        $this->validatePaymentMethod($invoice);
+        $this->validatePaymentMethod($invoice->getPaymentMethod());
         $this->validateTemplate($invoice);
         $this->validateClientData($invoice);
         $this->validateEstablishmentData($invoice);
-        $this->validateItems($invoice->getItems());
+        $this->validateItems($invoice->getItems(), $invoice->getInvoiceType());
         $this->validateForeignCurrency($invoice);
         $this->validateRne($invoice);
+        $this->validateDiscount($invoice->getDiscount());
 
         $this->throwIfErrors();
     }
 
+    /**
+     * Valide le type de facture
+     */
     private function validateInvoiceType(string $type): void
     {
         $allowedTypes = [Constants::INVOICE_TYPE_SALE, Constants::INVOICE_TYPE_PURCHASE];
         $this->validateInArray('invoiceType', $type, $allowedTypes, 'Type de facture');
     }
 
-    private function validatePaymentMethod(Invoice $invoice): void
+    /**
+     * Valide la méthode de paiement
+     */
+    private function validatePaymentMethod(string $method): void
     {
-        $allowedMethods = [
-            Constants::PAYMENT_CASH,
-            Constants::PAYMENT_CARD,
-            Constants::PAYMENT_CHECK,
-            Constants::PAYMENT_MOBILE_MONEY,
-            Constants::PAYMENT_TRANSFER,
-            Constants::PAYMENT_DEFERRED
-        ];
-
-        // Note: On devrait avoir une méthode getPaymentMethod() dans Invoice
-        // Pour l'instant, on assume qu'on peut accéder à cette propriété
+        $this->validateInArray(
+            'paymentMethod',
+            $method,
+            Constants::ALLOWED_PAYMENT_METHODS,
+            'Méthode de paiement'
+        );
     }
 
+    /**
+     * Valide le template et ses contraintes spécifiques
+     */
     private function validateTemplate(Invoice $invoice): void
     {
         $template = $invoice->getTemplate();
-        $allowedTemplates = [
-            Constants::TEMPLATE_B2B,
-            Constants::TEMPLATE_B2C,
-            Constants::TEMPLATE_B2F,
-            Constants::TEMPLATE_B2G
-        ];
 
-        $this->validateInArray('template', $template, $allowedTemplates, 'Type de facturation');
+        $this->validateInArray(
+            'template',
+            $template,
+            Constants::ALLOWED_TEMPLATES,
+            'Type de facturation'
+        );
 
-        // Validation spécifique B2B
+        // Validation spécifique B2B : NCC client obligatoire
         if ($template === Constants::TEMPLATE_B2B) {
-            // Le NCC client est obligatoire pour B2B
-            // Note: Il faudrait ajouter une méthode getClientNcc() à Invoice
+            $clientNcc = $invoice->getClientNcc();
+            if (empty($clientNcc)) {
+                $this->addError('clientNcc', 'Le NCC client est obligatoire pour les factures B2B');
+            } else {
+                $this->validateNcc('clientNcc', $clientNcc);
+            }
         }
     }
 
+    /**
+     * Valide les données client
+     */
     private function validateClientData(Invoice $invoice): void
     {
-        // Note: Il faudrait ajouter les getters correspondants à Invoice
-        // $this->validateRequired('clientCompanyName', $invoice->getClientCompanyName(), 'Nom du client');
-        // $this->validateRequired('clientPhone', $invoice->getClientPhone(), 'Téléphone client');
-        // $this->validateRequired('clientEmail', $invoice->getClientEmail(), 'Email client');
+        $this->validateRequired('clientCompanyName', $invoice->getClientCompanyName(), 'Nom du client');
+        $this->validateRequired('clientPhone', $invoice->getClientPhone(), 'Téléphone client');
+        $this->validateRequired('clientEmail', $invoice->getClientEmail(), 'Email client');
 
-        // if (!empty($invoice->getClientPhone())) {
-        //     $this->validatePhone('clientPhone', $invoice->getClientPhone());
-        // }
+        // Validation du téléphone
+        $phone = $invoice->getClientPhone();
+        if (!empty($phone)) {
+            $this->validatePhone('clientPhone', $phone);
+        }
 
-        // if (!empty($invoice->getClientEmail())) {
-        //     $this->validateEmail('clientEmail', $invoice->getClientEmail());
-        // }
-
-        // if ($invoice->getTemplate() === Constants::TEMPLATE_B2B && !empty($invoice->getClientNcc())) {
-        //     $this->validateNcc('clientNcc', $invoice->getClientNcc());
-        // }
+        // Validation de l'email
+        $email = $invoice->getClientEmail();
+        if (!empty($email)) {
+            $this->validateEmail('clientEmail', $email);
+        }
     }
 
+    /**
+     * Valide les données d'établissement
+     */
     private function validateEstablishmentData(Invoice $invoice): void
     {
-        // $this->validateRequired('pointOfSale', $invoice->getPointOfSale(), 'Point de vente');
-        // $this->validateRequired('establishment', $invoice->getEstablishment(), 'Établissement');
+        $this->validateRequired('pointOfSale', $invoice->getPointOfSale(), 'Point de vente');
+        $this->validateRequired('establishment', $invoice->getEstablishment(), 'Établissement');
     }
 
-    private function validateItems(array $items): void
+    /**
+     * Valide les articles de la facture
+     */
+    private function validateItems(array $items, string $invoiceType): void
     {
         if (empty($items)) {
             $this->addError('items', 'Au moins un article est requis');
@@ -103,31 +131,39 @@ class InvoiceValidator extends BaseValidator
                 continue;
             }
 
-            $this->validateItem($item, $index);
+            $this->validateItem($item, $index, $invoiceType);
         }
     }
 
-    private function validateItem(InvoiceItem $item, int $index): void
+    /**
+     * Valide un article individuel
+     */
+    private function validateItem(InvoiceItem $item, int $index, string $invoiceType): void
     {
-        $prefix = "items.{$index}";
+        $prefix = "item_{$index}";
 
-        $this->validateRequired("{$prefix}.description", $item->getDescription(), 'Description');
-        $this->validatePositiveNumber("{$prefix}.quantity", $item->getQuantity(), 'Quantité');
-        $this->validatePositiveNumber("{$prefix}.amount", $item->getAmount(), 'Prix unitaire');
+        $this->validateRequired("{$prefix}_description", $item->getDescription(), 'Description');
+        $this->validatePositiveNumber("{$prefix}_quantity", $item->getQuantity(), 'Quantité');
+        $this->validatePositiveNumber("{$prefix}_amount", $item->getAmount(), 'Prix unitaire');
 
-        if ($item->getDiscount() > 100) {
-            $this->addError("{$prefix}.discount", 'La remise ne peut pas dépasser 100%');
+        // Validation de la remise sur article
+        $discount = $item->getDiscount();
+        if ($discount < 0) {
+            $this->addError("{$prefix}_discount", 'La remise ne peut pas être négative');
+        } elseif ($discount > 100) {
+            $this->addError("{$prefix}_discount", 'La remise ne peut pas dépasser 100%');
         }
 
-        // Validation des taxes
-        $taxes = $item->getTaxes();
-        if (empty($taxes)) {
-            $this->addError("{$prefix}.taxes", 'Au moins un type de taxe est requis');
-        } else {
-            $allowedTaxes = [Constants::TAX_TVA, Constants::TAX_TVAB, Constants::TAX_TVAC, Constants::TAX_TVAD];
-            foreach ($taxes as $tax) {
-                if (!in_array($tax, $allowedTaxes)) {
-                    $this->addError("{$prefix}.taxes", "Type de taxe invalide: {$tax}");
+        // Validation des taxes (obligatoire pour les factures de vente uniquement)
+        if ($invoiceType === Constants::INVOICE_TYPE_SALE) {
+            $taxes = $item->getTaxes();
+            if (empty($taxes)) {
+                $this->addError("{$prefix}_taxes", 'Au moins un type de taxe est requis pour les factures de vente');
+            } else {
+                foreach ($taxes as $tax) {
+                    if (!in_array($tax, Constants::ALLOWED_TAX_TYPES)) {
+                        $this->addError("{$prefix}_tax", "Type de taxe invalide: {$tax}. Valeurs autorisées: TVA, TVAB, TVAC, TVAD");
+                    }
                 }
             }
         }
@@ -135,40 +171,69 @@ class InvoiceValidator extends BaseValidator
         // Validation des taxes personnalisées
         foreach ($item->getCustomTaxes() as $taxIndex => $customTax) {
             if (empty($customTax['name'])) {
-                $this->addError("{$prefix}.customTaxes.{$taxIndex}.name", 'Le nom de la taxe personnalisée est requis');
+                $this->addError("{$prefix}_customTax_{$taxIndex}_name", 'Le nom de la taxe personnalisée est requis');
             }
             if (!isset($customTax['amount']) || !is_numeric($customTax['amount']) || $customTax['amount'] < 0) {
-                $this->addError("{$prefix}.customTaxes.{$taxIndex}.amount", 'Le montant de la taxe doit être un nombre positif');
+                $this->addError("{$prefix}_customTax_{$taxIndex}_amount", 'Le montant de la taxe doit être un nombre positif');
             }
         }
     }
 
+    /**
+     * Valide la devise étrangère et le taux de change
+     */
     private function validateForeignCurrency(Invoice $invoice): void
     {
-        // Note: Il faudrait ajouter les getters correspondants
-        // $currency = $invoice->getForeignCurrency();
-        // $rate = $invoice->getForeignCurrencyRate();
+        $currency = $invoice->getForeignCurrency();
+        $rate = $invoice->getForeignCurrencyRate();
+        $template = $invoice->getTemplate();
 
-        // if (!empty($currency)) {
-        //     $allowedCurrencies = [
-        //         Constants::CURRENCY_XOF,
-        //         Constants::CURRENCY_USD,
-        //         Constants::CURRENCY_EUR,
-        //         Constants::CURRENCY_GBP
-        //     ];
-        //     $this->validateInArray('foreignCurrency', $currency, $allowedCurrencies, 'Devise étrangère');
+        if (!empty($currency)) {
+            // Validation de la devise
+            $this->validateInArray(
+                'foreignCurrency',
+                $currency,
+                Constants::ALLOWED_CURRENCIES,
+                'Devise étrangère'
+            );
 
-        //     if ($invoice->getTemplate() === Constants::TEMPLATE_B2F && $rate <= 0) {
-        //         $this->addError('foreignCurrencyRate', 'Le taux de change est obligatoire pour les transactions B2F');
-        //     }
-        // }
+            // Pour B2F avec devise étrangère, le taux est obligatoire et doit être > 0
+            if ($template === Constants::TEMPLATE_B2F && $rate <= 0) {
+                $this->addError(
+                    'foreignCurrencyRate',
+                    'Le taux de change est obligatoire et doit être supérieur à 0 pour les transactions B2F avec devise étrangère'
+                );
+            }
+
+            // Si une devise est spécifiée, le taux doit être positif
+            if ($rate < 0) {
+                $this->addError('foreignCurrencyRate', 'Le taux de change ne peut pas être négatif');
+            }
+        }
     }
 
+    /**
+     * Valide les données RNE (Reçu Normalisé Électronique)
+     */
     private function validateRne(Invoice $invoice): void
     {
-        // Note: Il faudrait ajouter les getters correspondants
-        // if ($invoice->isRne() && empty($invoice->getRne())) {
-        //     $this->addError('rne', 'Le numéro du reçu est obligatoire si isRne est true');
-        // }
+        if ($invoice->isRne()) {
+            $rne = $invoice->getRne();
+            if (empty($rne)) {
+                $this->addError('rne', 'Le numéro du reçu est obligatoire lorsque isRne est true');
+            }
+        }
+    }
+
+    /**
+     * Valide la remise globale sur la facture
+     */
+    private function validateDiscount(float $discount): void
+    {
+        if ($discount < 0) {
+            $this->addError('discount', 'La remise globale ne peut pas être négative');
+        } elseif ($discount > 100) {
+            $this->addError('discount', 'La remise globale ne peut pas dépasser 100%');
+        }
     }
 }

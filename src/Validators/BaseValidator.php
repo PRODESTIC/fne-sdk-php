@@ -13,7 +13,7 @@ abstract class BaseValidator
         $this->errors[$field] = $message;
     }
 
-    protected function validateRequired(string $field, $value, string $fieldName = null): bool
+    protected function validateRequired(string $field, $value, ?string $fieldName = null): bool
     {
         $fieldName = $fieldName ?? $field;
 
@@ -43,7 +43,7 @@ abstract class BaseValidator
         return true;
     }
 
-    protected function validateInArray(string $field, $value, array $allowedValues, string $fieldName = null): bool
+    protected function validateInArray(string $field, $value, array $allowedValues, ?string $fieldName = null): bool
     {
         $fieldName = $fieldName ?? $field;
 
@@ -55,7 +55,7 @@ abstract class BaseValidator
         return true;
     }
 
-    protected function validatePositiveNumber(string $field, $value, string $fieldName = null): bool
+    protected function validatePositiveNumber(string $field, $value, ?string $fieldName = null): bool
     {
         $fieldName = $fieldName ?? $field;
 
